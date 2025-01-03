@@ -1,13 +1,5 @@
 name: Build Kernel
 on:
-  push: 
-    branches:
-          - "KernelSU_Next_suSFS" 
-  pull_request: 
-     branches: 
-          - "kernel-tree_lancelot" 
-     paths:
-          - ".github/workflows/build-kernel.yml"
   workflow_dispatch:
 
 jobs:
@@ -33,7 +25,6 @@ jobs:
             KERNELSU_TAG
             KSU_EXPECTED_SIZE
             KSU_EXPECTED_HASH
-            KSU_NEXT_REVERT
             KSU_REVERT
             ADD_KPROBES_CONFIG
             KSU_HOOKS_PATCH
@@ -41,9 +32,6 @@ jobs:
             ADD_APATCH_SUPPORT
             FIX_APATCH_OPENELA
             OLD_ANDROID_SUPPORT
-            CONFIG_KSU
-            CONFIG_KSU_SUSFS
-            CONFIG_KSU_SUSFS_SUS_SU
             USE_CUSTOM_CLANG
             CUSTOM_CLANG_SOURCE
             CUSTOM_CLANG_BRANCH
@@ -218,52 +206,32 @@ jobs:
             echo "HAVE_SOURCE_BOOT_IMAGE=true" >> $GITHUB_ENV
         fi
 
-
-
-
     - name: Setup KernelSU
       if: env.ENABLE_KERNELSU == 'true'
       run: |
         cd $GITHUB_WORKSPACE/kernel_workspace/android-kernel
-        curl -LSs "https://raw.githubusercontent.com/rifsxd/KernelSU-Next/next/kernel/setup.sh" | bash -s next-susfs-4.14
-            KSU_VERSION="_$(cd KernelSU && expr $(/usr/bin/git rev-list --count HEAD) + 10200)"
         
-
+        curl -LSs "https://raw.githubusercontent.com/rifsxd/KernelSU-Next/next/kernel/setup.sh" | bash -s next-susfs-4.14
+        KSU_VERSION=$(cd KernelSU-Next && expr $(/usr/bin/git rev-list --count HEAD) + 10200)
 
         git clone https://gitlab.com/simonpunk/susfs4ksu.git -b kernel-4.14
+        cd susfs4ksu
+        git switch 516e40c6 --detach
+        cd ..
+        cp ./susfs4ksu/kernel_patches/include/linux/susfs.h $GITHUB_WORKSPACE/kernel_workspace/android-kernel/include/linux/
+        cp ./susfs4ksu/kernel_patches/fs/susfs.c $GITHUB_WORKSPACE/kernel_workspace/android-kernel/fs/
+        cp ./susfs4ksu/kernel_patches/50_add_susfs_in_kernel-4.14.patch $GITHUB_WORKSPACE/kernel_workspace/android-kernel
+        patch -p1 < 50_add_susfs_in_kernel-4.14.patch || echo "Patch failed, skipping."
 
+        sed -i '/struct ratelimit_state ratelimit;/a\#if defined(CONFIG_KSU_SUSFS) && !defined(ANDROID_KABI_RESERVE)\nu64 android_kabi_reserved2;\n#endif\nANDROID_KABI_RESERVE(1);\nANDROID_KABI_RESERVE(2);' $GITHUB_WORKSPACE/kernel_workspace/android-kernel/include/linux/sched/user.h
 
+        ls $GITHUB_WORKSPACE/kernel_workspace/android-kernel/include/linux/susfs.h
+        ls $GITHUB_WORKSPACE/kernel_workspace/android-kernel/fs/susfs.c
 
-        sed -i '/^#define CMD_SUSFS_SUS_SU 0x60000/a #define USER_STRUCT_KABI2_NON_ROOT_USER_APP_PROFILE 16777216 // 1 << 24, for distinguishing root/no-root granted user app process' $GITHUB_WORKSPACE/kernel_workspace/android-kernel/susfs4ksu/kernel_patches/include/linux/susfs_def.h
-
-
-        mkdir $GITHUB_WORKSPACE/kernel_workspace/android-kernel/KernelSU/
- 
-        cp $GITHUB_WORKSPACE/kernel_workspace/android-kernel/susfs4ksu/kernel_patches/KernelSU/* $GITHUB_WORKSPACE/kernel_workspace/android-kernel/KernelSU/
-
-        cp $GITHUB_WORKSPACE/kernel_workspace/android-kernel/susfs4ksu/kernel_patches/50_add_susfs_in_kernel-4.14.patch $GITHUB_WORKSPACE/kernel_workspace/android-kernel/
-
-        cp $GITHUB_WORKSPACE/kernel_workspace/android-kernel/susfs4ksu/kernel_patches/include/linux/* $GITHUB_WORKSPACE/kernel_workspace/android-kernel/include/linux/
-
-        cp $GITHUB_WORKSPACE/kernel_workspace/android-kernel/susfs4ksu/kernel_patches/fs/* $GITHUB_WORKSPACE/kernel_workspace/android-kernel/fs/
-
-        cd $GITHUB_WORKSPACE/kernel_workspace/android-kernel/KernelSU
-
-        patch -p1 < 10_enable_susfs_for_ksu.patch || echo "Patch 10 enable failed, skipping."
-
-        cd $GITHUB_WORKSPACE/kernel_workspace/android-kernel/
-
-        patch -p1 < 50_add_susfs_in_kernel-4.14.patch || echo "Patch 50 add susfs failed, skipping."
-
+        grep -r "susfs_is_sus_su_hooks_enabled" .
 
         echo "KSUVER=$KSU_VERSION" >> $GITHUB_ENV
-
-
-       
         
-
-
-
     - name: Setup Configuration for Kernel
       run: |
         cd $GITHUB_WORKSPACE/kernel_workspace/android-kernel
