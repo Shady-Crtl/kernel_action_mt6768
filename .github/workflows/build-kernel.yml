@@ -33,6 +33,7 @@ jobs:
             KERNELSU_TAG
             KSU_EXPECTED_SIZE
             KSU_EXPECTED_HASH
+            KSU_NEXT_REVERT
             KSU_REVERT
             ADD_KPROBES_CONFIG
             KSU_HOOKS_PATCH
