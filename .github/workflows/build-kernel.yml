@@ -32,6 +32,9 @@ jobs:
             ADD_APATCH_SUPPORT
             FIX_APATCH_OPENELA
             OLD_ANDROID_SUPPORT
+            CONFIG_KSU
+            CONFIG_KSU_SUSFS
+            CONFIG_KSU_SUSFS_SUS_SU
             USE_CUSTOM_CLANG
             CUSTOM_CLANG_SOURCE
             CUSTOM_CLANG_BRANCH
